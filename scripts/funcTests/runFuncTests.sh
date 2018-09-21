@@ -36,8 +36,10 @@ curl -o cli/dotnet-install.sh https://raw.githubusercontent.com/dotnet/cli/4bd9b
 
 # Run install.sh
 chmod +x cli/dotnet-install.sh
-# cli/dotnet-install.sh -i cli -c 2.0 --version 2.0.2
-cli/dotnet-install.sh -i cli -c preview --version 1.0.4
+# v1 needed for some test
+cli/dotnet-install.sh -i cli -c 1.0
+# todo: update to read version from build.props
+cli/dotnet-install.sh -i cli -c release/2.2.1xx
 
 # Display current version
 DOTNET="$(pwd)/cli/dotnet"
