@@ -7,194 +7,609 @@ using System.IO;
 using FluentAssertions;
 using NuGet.Common;
 using NuGet.Configuration;
+using NuGet.PackageManagement.Telemetry;
 using Xunit;
 
 namespace NuGet.SolutionRestoreManager.Test
 {
     public class SourceTelemetryTests
     {
+        private const string NumLocalFeeds = "NumLocalFeeds";
+        private const string NumHTTPv2Feeds = "NumHTTPv2Feeds";
+        private const string NumHTTPv3Feeds = "NumHTTPv3Feeds";
+        private const string ParentId = "ParentId";
+        private const string NuGetOrg = "NuGetOrg";
+        private const string NotPresent = "NotPresent";
+        private const string YesV2 = "YesV2";
+        private const string YesV3 = "YesV3";
+        private const string YesV3AndV2 = "YesV3AndV2";
+        private const string VsOfflinePackages = "VsOfflinePackages";
+        private const string DotnetCuratedFeed = "DotnetCuratedFeed";
+
         private static readonly Guid Parent = Guid.Parse("33411664-388A-4C48-A607-A2C554171FCE");
 
-        [Fact]
-        public void SourceTelemetry_GivenEmptySourcesVerifyZeroCounts()
+        public class RestorePackageSourceSummary
         {
-            var sources = new List<PackageSource>();
-            var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
-            var summaryStrings = GetValuesAsStrings(summary);
-            var summaryInts = GetValuesAsInts(summary);
+            [Fact]
+            public void GivenEmptySourcesVerifyZeroCounts()
+            {
+                var sources = new List<PackageSource>();
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
 
-            summaryInts["NumLocalFeeds"].Should().Be(0);
-            summaryInts["NumHTTPv2Feeds"].Should().Be(0);
-            summaryInts["NumHTTPv3Feeds"].Should().Be(0);
-            summaryStrings["ParentId"].Should().Be(Parent.ToString());
-            summaryStrings["NuGetOrg"].Should().Be("NotPresent");
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+            }
+
+            [Fact]
+            public void GivenNuGetCuratedFeedVerifySummary()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://www.nuget.org/api/v2/curated-feeds/microsoftdotnet/")
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(YesV2);
+            }
+
+            [Fact]
+            public void GivenNuGetV2WithoutSubdomainVerifySummary()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://NuGet.org/api/v2/")
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+            }
+
+            [Fact]
+            public void GivenOnlyNuGetV2VerifySummary()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://www.NuGet.org/api/v2/")
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(YesV2);
+            }
+
+            [Fact]
+            public void GivenOnlyNuGetV3WithoutSubdomainVerifySummary()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://nuget.org/v3/index.JSON")
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(1);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+            }
+
+            [Fact]
+            public void GivenOnlyNuGetV3VerifySummary()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://api.nuget.org/v3/index.JSON")
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(1);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(YesV3);
+            }
+
+            [Fact]
+            public void GivenOnlyNuGetV2andV3VerifySummary()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://www.NuGet.org/api/v2/"),
+                    new PackageSource("https://api.nuget.org/v3/index.json")
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(1);
+                summaryStrings[NuGetOrg].Should().Be(YesV3);
+            }
+
+            [Fact]
+            public void GivenDisabledFeedsVerifyCount()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://www.NuGet.org/api/v2/", "n1", isEnabled: false),
+                    new PackageSource("https://api.nuget.org/v3/index.json", "n2", isEnabled: false),
+                    new PackageSource("packages")
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(1);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+            }
+
+            [Fact]
+            public void VerifySubDomainNuGetOrgIsNotCounted()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://www.NuGet.org.myget.org/www.nuget.org/v2/"),
+                    new PackageSource("https://api.nuget.org.myget.org/api.nuget.org/index.json")
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+            }
+
+            [Fact]
+            public void LocalFeedsVerifyCount()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("packages"),
+                    new PackageSource(UriUtility.CreateSourceUri(Path.Combine(Path.GetTempPath(), "packages"), UriKind.Absolute).AbsoluteUri),
+                    new PackageSource(@"\\share\packages"),
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryInts[NumLocalFeeds].Should().Be(3);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+            }
+
+            [Fact]
+            public void GivenAnInvalidSourceVerifyNoFailures()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("file:/bad!|source"),
+                    new PackageSource("https:/bad"),
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryInts[NumLocalFeeds].Should().Be(2);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+            }
+
+            [Fact]
+            public void VerifyV3Feed()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("http://tempuri.local/index.json")
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(1);
+            }
+
+            [Fact]
+            public void VerifyV2Feed()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("http://tempuri.local/packages/")
+                };
+
+                var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+            }
         }
 
-        [Fact]
-        public void SourceTelemetry_GivenOnlyNuGetV2VerifySummary()
+        public class SearchPackageSourceSummary
         {
-            var sources = new List<PackageSource>()
+            [Fact]
+            public void GivenEmptySourcesVerifyZeroCounts()
             {
-                new PackageSource("https://www.NuGet.org/api/v2/")
-            };
+                var sources = new List<PackageSource>();
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
 
-            var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
-            var summaryStrings = GetValuesAsStrings(summary);
-            var summaryInts = GetValuesAsInts(summary);
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
 
-            summaryInts["NumLocalFeeds"].Should().Be(0);
-            summaryInts["NumHTTPv2Feeds"].Should().Be(1);
-            summaryInts["NumHTTPv3Feeds"].Should().Be(0);
-            summaryStrings["ParentId"].Should().Be(Parent.ToString());
-            summaryStrings["NuGetOrg"].Should().Be("YesV2");
-        }
-
-        [Fact]
-        public void SourceTelemetry_GivenOnlyNuGetV3VerifySummary()
-        {
-            var sources = new List<PackageSource>()
+            [Fact]
+            public void GivenNuGetCuratedFeedVerifySummary()
             {
-                new PackageSource("https://api.nuget.org/v3/index.JSON")
-            };
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://www.nuget.org/api/v2/curated-feeds/microsoftdotnet/")
+                };
 
-            var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
-            var summaryStrings = GetValuesAsStrings(summary);
-            var summaryInts = GetValuesAsInts(summary);
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
 
-            summaryInts["NumLocalFeeds"].Should().Be(0);
-            summaryInts["NumHTTPv2Feeds"].Should().Be(0);
-            summaryInts["NumHTTPv3Feeds"].Should().Be(1);
-            summaryStrings["ParentId"].Should().Be(Parent.ToString());
-            summaryStrings["NuGetOrg"].Should().Be("YesV3");
-        }
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(true);
+            }
 
-        [Fact]
-        public void SourceTelemetry_GivenOnlyNuGetV2andV3VerifySummary()
-        {
-            var sources = new List<PackageSource>()
+            [Theory]
+            [InlineData(true)]
+            [InlineData(false)]
+            public void GivenVsPackagesSourceVerifySummary(bool trailingSlash)
             {
-                new PackageSource("https://www.NuGet.org/api/v2/"),
-                new PackageSource("https://api.nuget.org/v3/index.json")
-            };
+                // Specify both so this test works on 32-bit and 64-bit processes.
+                var suffix = trailingSlash ? @"\" : string.Empty;
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource(@"C:\Program Files (x86)\Microsoft SDKs\NuGetPackages" + suffix),
+                    new PackageSource(@"C:\Program Files\Microsoft SDKs\NuGetPackages" + suffix)
+                };
 
-            var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
-            var summaryStrings = GetValuesAsStrings(summary);
-            var summaryInts = GetValuesAsInts(summary);
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
 
-            summaryInts["NumHTTPv2Feeds"].Should().Be(1);
-            summaryInts["NumHTTPv3Feeds"].Should().Be(1);
-            summaryStrings["NuGetOrg"].Should().Be("YesV3");
-        }
+                summaryInts[NumLocalFeeds].Should().Be(2);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryBools[VsOfflinePackages].Should().Be(true);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
 
-        [Fact]
-        public void SourceTelemetry_GivenDisabledFeedsVerifyCount()
-        {
-            var sources = new List<PackageSource>()
+            [Fact]
+            public void GivenNuGetV2WithoutSubdomainVerifySummary()
             {
-                new PackageSource("https://www.NuGet.org/api/v2/", "n1", isEnabled: false),
-                new PackageSource("https://api.nuget.org/v3/index.json", "n2", isEnabled: false),
-                new PackageSource("packages")
-            };
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://NuGet.org/api/v2/")
+                };
 
-            var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
-            var summaryStrings = GetValuesAsStrings(summary);
-            var summaryInts = GetValuesAsInts(summary);
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
 
-            summaryInts["NumLocalFeeds"].Should().Be(1);
-            summaryInts["NumHTTPv2Feeds"].Should().Be(0);
-            summaryInts["NumHTTPv3Feeds"].Should().Be(0);
-            summaryStrings["NuGetOrg"].Should().Be("NotPresent");
-        }
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(YesV2);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
 
-        [Fact]
-        public void SourceTelemetry_VerifySubDomainNuGetOrgIsNotCounted()
-        {
-            var sources = new List<PackageSource>()
+            [Fact]
+            public void GivenOnlyNuGetV2VerifySummary()
             {
-                new PackageSource("https://www.NuGet.org.myget.org/www.nuget.org/v2/"),
-                new PackageSource("https://api.nuget.org.myget.org/api.nuget.org/index.json")
-            };
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://www.NuGet.org/api/v2/")
+                };
 
-            var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
-            var summaryStrings = GetValuesAsStrings(summary);
-            var summaryInts = GetValuesAsInts(summary);
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
 
-            summaryStrings["NuGetOrg"].Should().Be("NotPresent");
-        }
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(YesV2);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
 
-        [Fact]
-        public void SourceTelemetry_LocalFeedsVerifyCount()
-        {
-            var sources = new List<PackageSource>()
+            [Fact]
+            public void GivenOnlyNuGetV3WithoutSubdomainVerifySummary()
             {
-                new PackageSource("packages"),
-                new PackageSource(UriUtility.CreateSourceUri(Path.Combine(Path.GetTempPath(), "packages"), UriKind.Absolute).AbsoluteUri),
-                new PackageSource(@"\\share\packages"),
-            };
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://nuget.org/v3/index.JSON")
+                };
 
-            var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
-            var summaryStrings = GetValuesAsStrings(summary);
-            var summaryInts = GetValuesAsInts(summary);
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
 
-            summaryStrings["NuGetOrg"].Should().Be("NotPresent");
-            summaryInts["NumLocalFeeds"].Should().Be(3);
-            summaryInts["NumHTTPv2Feeds"].Should().Be(0);
-            summaryInts["NumHTTPv3Feeds"].Should().Be(0);
-        }
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(1);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(YesV3);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
 
-        [Fact]
-        public void SourceTelemetry_GivenAnInvalidSourceVerifyNoFailures()
-        {
-            var sources = new List<PackageSource>()
+            [Fact]
+            public void GivenOnlyNuGetV3VerifySummary()
             {
-                new PackageSource("file:/bad!|source"),
-                new PackageSource("https:/bad"),
-            };
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://api.nuget.org/v3/index.JSON")
+                };
 
-            var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
-            var summaryStrings = GetValuesAsStrings(summary);
-            var summaryInts = GetValuesAsInts(summary);
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
 
-            summaryStrings["NuGetOrg"].Should().Be("NotPresent");
-            summaryInts["NumLocalFeeds"].Should().Be(2);
-            summaryInts["NumHTTPv2Feeds"].Should().Be(0);
-            summaryInts["NumHTTPv3Feeds"].Should().Be(0);
-        }
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(1);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(YesV3);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
 
-        [Fact]
-        public void SourceTelemetry_VerifyV3Feed()
-        {
-            var sources = new List<PackageSource>()
+            [Fact]
+            public void GivenOnlyNuGetV3andV2VerifySummary()
             {
-                new PackageSource("http://tempuri.local/index.json")
-            };
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://api.nuget.org/v3/index.json"),
+                    new PackageSource("https://www.NuGet.org/api/v2/"),
+                };
 
-            var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
-            var summaryStrings = GetValuesAsStrings(summary);
-            var summaryInts = GetValuesAsInts(summary);
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
 
-            summaryStrings["NuGetOrg"].Should().Be("NotPresent");
-            summaryInts["NumLocalFeeds"].Should().Be(0);
-            summaryInts["NumHTTPv2Feeds"].Should().Be(0);
-            summaryInts["NumHTTPv3Feeds"].Should().Be(1);
-        }
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(1);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(YesV3AndV2);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
 
-        [Fact]
-        public void SourceTelemetry_VerifyV2Feed()
-        {
-            var sources = new List<PackageSource>()
+            [Fact]
+            public void GivenOnlyNuGetV2andV3VerifySummary()
             {
-                new PackageSource("http://tempuri.local/packages/")
-            };
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://www.NuGet.org/api/v2/"),
+                    new PackageSource("https://api.nuget.org/v3/index.json"),
+                };
 
-            var summary = SourceTelemetry.GetSourceSummaryEvent(Parent, sources);
-            var summaryStrings = GetValuesAsStrings(summary);
-            var summaryInts = GetValuesAsInts(summary);
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
 
-            summaryStrings["NuGetOrg"].Should().Be("NotPresent");
-            summaryInts["NumLocalFeeds"].Should().Be(0);
-            summaryInts["NumHTTPv2Feeds"].Should().Be(1);
-            summaryInts["NumHTTPv3Feeds"].Should().Be(0);
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(1);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(YesV3AndV2);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
+
+            [Fact]
+            public void GivenDisabledFeedsVerifyCount()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://www.NuGet.org/api/v2/", "n1", isEnabled: false),
+                    new PackageSource("https://api.nuget.org/v3/index.json", "n2", isEnabled: false),
+                    new PackageSource("packages")
+                };
+
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(1);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
+
+            [Fact]
+            public void VerifySubDomainNuGetOrgIsNotCounted()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("https://www.NuGet.org.myget.org/www.nuget.org/v2/"),
+                    new PackageSource("https://api.nuget.org.myget.org/api.nuget.org/index.json")
+                };
+
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(1);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
+
+            [Fact]
+            public void LocalFeedsVerifyCount()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("packages"),
+                    new PackageSource(UriUtility.CreateSourceUri(Path.Combine(Path.GetTempPath(), "packages"), UriKind.Absolute).AbsoluteUri),
+                    new PackageSource(@"\\share\packages"),
+                };
+
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(3);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
+
+            [Fact]
+            public void GivenAnInvalidSourceVerifyNoFailures()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("file:/bad!|source"),
+                    new PackageSource("https:/bad"),
+                };
+
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(2);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
+
+            [Fact]
+            public void VerifyV3Feed()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("http://tempuri.local/index.json")
+                };
+
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(0);
+                summaryInts[NumHTTPv3Feeds].Should().Be(1);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
+
+            [Fact]
+            public void VerifyV2Feed()
+            {
+                var sources = new List<PackageSource>()
+                {
+                    new PackageSource("http://tempuri.local/packages/")
+                };
+
+                var summary = SourceTelemetry.GetSearchSourceSummaryEvent(Parent, sources);
+                var summaryStrings = GetValuesAsStrings(summary);
+                var summaryInts = GetValuesAsInts(summary);
+                var summaryBools = GetValuesAsBools(summary);
+
+                summaryInts[NumLocalFeeds].Should().Be(0);
+                summaryInts[NumHTTPv2Feeds].Should().Be(1);
+                summaryInts[NumHTTPv3Feeds].Should().Be(0);
+                summaryStrings[ParentId].Should().Be(Parent.ToString());
+                summaryStrings[NuGetOrg].Should().Be(NotPresent);
+                summaryBools[VsOfflinePackages].Should().Be(false);
+                summaryBools[DotnetCuratedFeed].Should().Be(false);
+            }
         }
 
         private static Dictionary<string, string> GetValuesAsStrings(TelemetryEvent item)
@@ -218,6 +633,19 @@ namespace NuGet.SolutionRestoreManager.Test
             while (e.MoveNext())
             {
                 values.Add(e.Current.Key, e.Current.Value as int?);
+            }
+
+            return values;
+        }
+
+        private static Dictionary<string, bool?> GetValuesAsBools(TelemetryEvent item)
+        {
+            var values = new Dictionary<string, bool?>(StringComparer.OrdinalIgnoreCase);
+            var e = item.GetEnumerator();
+
+            while (e.MoveNext())
+            {
+                values.Add(e.Current.Key, e.Current.Value as bool?);
             }
 
             return values;
