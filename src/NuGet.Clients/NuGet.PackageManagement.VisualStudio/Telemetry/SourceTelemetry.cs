@@ -34,70 +34,33 @@ namespace NuGet.PackageManagement.Telemetry
             }
         });
 
-        /// <summary>
-        /// Create a SourceSummaryEvent event with counts of local vs http and v2 vs v3 feeds.
-        /// </summary>
-        public static TelemetryEvent GetSourceSummaryEvent(Guid parentId, IEnumerable<PackageSource> packageSources)
+        public static TelemetryEvent GetRestoreSourceSummaryEvent(
+            Guid parentId,
+            IEnumerable<PackageSource> packageSources)
         {
-            var local = 0;
-            var httpV2 = 0;
-            var httpV3 = 0;
-            var hasNuGetOrgV3 = false;
-            var nugetOrg = HttpStyle.NotPresent;
-
-            if (packageSources != null)
-            {
-                foreach (var source in packageSources)
-                {
-                    // Ignore disabled sources
-                    if (source.IsEnabled)
-                    {
-                        if (source.IsHttp)
-                        {
-                            if (IsHttpV3(source))
-                            {
-                                // Http V3 feed
-                                httpV3++;
-
-                                if (IsHttpNuGetOrgSubdomain(source))
-                                {
-                                    hasNuGetOrgV3 = true;
-                                    nugetOrg = HttpStyle.YesV3;
-                                }
-                            }
-                            else
-                            {
-                                // Http V2 feed
-                                httpV2++;
-
-                                // Prefer v3 over v2 if v3 is found
-                                if (!hasNuGetOrgV3 && IsHttpNuGetOrgSubdomain(source))
-                                {
-                                    nugetOrg = HttpStyle.YesV2;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            // Local or UNC feed
-                            local++;
-                        }
-                    }
-                }
-            }
-
-            return new RestorePackageSourceSummaryTelemetryEvent(
+            return GetSourceSummaryEvent(
+                "RestorePackageSourceSummary",
                 parentId,
-                local,
-                httpV2,
-                httpV3,
-                nugetOrg.ToString());
+                packageSources);
+        }
+
+        public static TelemetryEvent GetSearchSourceSummaryEvent(
+            Guid parentId,
+            IEnumerable<PackageSource> packageSources)
+        {
+            return GetSourceSummaryEvent(
+                "SearchPackageSourceSummary",
+                parentId,
+                packageSources);
         }
 
         /// <summary>
         /// Create a SourceSummaryEvent event with counts of local vs http and v2 vs v3 feeds.
         /// </summary>
-        public static TelemetryEvent GetSearchSourceSummaryEvent(Guid parentId, IEnumerable<PackageSource> packageSources)
+        private static TelemetryEvent GetSourceSummaryEvent(
+            string eventName,
+            Guid parentId,
+            IEnumerable<PackageSource> packageSources)
         {
             var local = 0;
             var httpV2 = 0;
@@ -161,7 +124,8 @@ namespace NuGet.PackageManagement.Telemetry
                 }
             }
 
-            return new SearchPackageSourceSummaryTelemetryEvent(
+            return new SourceSummaryTelemetryEvent(
+                eventName,
                 parentId,
                 local,
                 httpV2,
@@ -179,14 +143,6 @@ namespace NuGet.PackageManagement.Telemetry
             return source.IsHttp &&
                 (source.Source.EndsWith("index.json", StringComparison.OrdinalIgnoreCase)
                 || source.ProtocolVersion == 3);
-        }
-
-        /// <summary>
-        /// True if the source is http and has a *.nuget.org host.
-        /// </summary>
-        private static bool IsHttpNuGetOrgSubdomain(PackageSource source)
-        {
-            return (source.IsHttp && source.TrySourceAsUri?.Host.EndsWith(".nuget.org", StringComparison.OrdinalIgnoreCase) == true);
         }
 
         /// <summary>
@@ -218,32 +174,12 @@ namespace NuGet.PackageManagement.Telemetry
         // NumHTTPv2Feeds
         // NumHTTPv3Feeds
         // NuGetOrg: [NotPresent | YesV2 | YesV3]
-        private class RestorePackageSourceSummaryTelemetryEvent : TelemetryEvent
-        {
-            public RestorePackageSourceSummaryTelemetryEvent(
-                Guid parentId,
-                int local,
-                int httpV2,
-                int httpV3,
-                string nugetOrg) : base("RestorePackageSourceSummary")
-            {
-                this["NumLocalFeeds"] = local;
-                this["NumHTTPv2Feeds"] = httpV2;
-                this["NumHTTPv3Feeds"] = httpV3;
-                this["NuGetOrg"] = nugetOrg;
-                this["ParentId"] = parentId.ToString();
-            }
-        }
-
-        // NumLocalFeeds(c:\ or \\ or file:///)
-        // NumHTTPv2Feeds
-        // NumHTTPv3Feeds
-        // NuGetOrg: [NotPresent | YesV2 | YesV3]
         // VsOfflinePackages: [true | false]
         // DotnetCuratedFeed: [true | false]
-        private class SearchPackageSourceSummaryTelemetryEvent : TelemetryEvent
+        private class SourceSummaryTelemetryEvent : TelemetryEvent
         {
-            public SearchPackageSourceSummaryTelemetryEvent(
+            public SourceSummaryTelemetryEvent(
+                string eventName,
                 Guid parentId,
                 int local,
                 int httpV2,
@@ -251,7 +187,7 @@ namespace NuGet.PackageManagement.Telemetry
                 string nugetOrg,
                 bool vsOfflinePackages,
                 bool dotnetCuratedFeed)
-                : base("SearchPackageSourceSummary")
+                : base(eventName)
             {
                 this["NumLocalFeeds"] = local;
                 this["NumHTTPv2Feeds"] = httpV2;
