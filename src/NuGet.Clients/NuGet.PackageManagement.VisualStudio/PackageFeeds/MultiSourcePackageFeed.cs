@@ -45,7 +45,7 @@ namespace NuGet.PackageManagement.VisualStudio
             public Stopwatch Duration { get; }
 
             /// <summary>
-            /// This telemetry state should be emitted exactly one. This property will return true the first time it
+            /// This telemetry state should be emitted exactly once. This property will return true the first time it
             /// is called, then false for every subsequent call.
             /// </summary>
             public bool ShouldEmit
